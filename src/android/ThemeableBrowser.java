@@ -315,15 +315,17 @@ public class ThemeableBrowser extends CordovaPlugin {
             @SuppressLint("NewApi")
             @Override
             public void run() {
-                if (inAppWebView != null) {
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-                        // This action will have the side-effect of blurring the currently focused
-                        // element
-                        inAppWebView.loadUrl("javascript:" + finalScriptToInject);
-                    } else {
-                        inAppWebView.evaluateJavascript(finalScriptToInject, null);
+                try{
+                    if (inAppWebView != null) {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+                            // This action will have the side-effect of blurring the currently focused
+                            // element
+                            inAppWebView.loadUrl("javascript:" + finalScriptToInject);
+                        } else {
+                            inAppWebView.evaluateJavascript(finalScriptToInject, null);
+                        }
                     }
-                }
+                }catch(Exception e){}
             }
         });
     }
@@ -394,40 +396,41 @@ public class ThemeableBrowser extends CordovaPlugin {
         this.cordova.getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                // The JS protects against multiple calls, so this should happen only when
-                // closeDialog() is called by other native code.
-                if (inAppWebView == null) {
-                    emitWarning(WRN_UNEXPECTED, "Close called but already closed.");
-                    return;
-                }
-
-                inAppWebView.setWebViewClient(new WebViewClient() {
-                    // NB: wait for about:blank before dismissing
-                    public void onPageFinished(WebView view, String url) {
-                        if (dialog != null) {
-                            dialog.dismiss();
-                        }
-
-                        // Clean up.
-                        dialog = null;
-                        inAppWebView = null;
-                        edittext = null;
-                        callbackContext = null;
+                try{
+                    // The JS protects against multiple calls, so this should happen only when
+                    // closeDialog() is called by other native code.
+                    if (inAppWebView == null) {
+                        emitWarning(WRN_UNEXPECTED, "Close called but already closed.");
+                        return;
                     }
-                });
 
-                // NB: From SDK 19: "If you call methods on WebView from any
-                // thread other than your app's UI thread, it can cause
-                // unexpected results."
-                // http://developer.android.com/guide/webapps/migrating.html#Threads
-                inAppWebView.loadUrl("about:blank");
+                    inAppWebView.setWebViewClient(new WebViewClient() {
+                        // NB: wait for about:blank before dismissing
+                        public void onPageFinished(WebView view, String url) {
+                            try{
+                                if (dialog != null) {
+                                    dialog.dismiss();
+                                }
 
-                try {
+                                // Clean up.
+                                dialog = null;
+                                inAppWebView = null;
+                                edittext = null;
+                                callbackContext = null;
+                            }catch(Exception e){}
+                        }
+                    });
+
+                    // NB: From SDK 19: "If you call methods on WebView from any
+                    // thread other than your app's UI thread, it can cause
+                    // unexpected results."
+                    // http://developer.android.com/guide/webapps/migrating.html#Threads
+                    inAppWebView.loadUrl("about:blank");
+
                     JSONObject obj = new JSONObject();
                     obj.put("type", EXIT_EVENT);
                     sendUpdate(obj, false);
-                } catch (JSONException ex) {
-                }
+                } catch (Exception ex) {}
             }
         });
     }
@@ -631,15 +634,17 @@ public class ThemeableBrowser extends CordovaPlugin {
                     "back button",
                     new View.OnClickListener() {
                         public void onClick(View v) {
-                            emitButtonEvent(
-                                    features.backButton,
-                                    inAppWebView.getUrl());
+                            try{
+                                emitButtonEvent(
+                                        features.backButton,
+                                        inAppWebView.getUrl());
 
-                            if (features.backButtonCanClose && !canGoBack()) {
-                                closeDialog();
-                            } else {
-                                goBack();
-                            }
+                                if (features.backButtonCanClose && !canGoBack()) {
+                                    closeDialog();
+                                } else {
+                                    goBack();
+                                }
+                            }catch(Exception e){}
                         }
                     }
                 );
@@ -654,11 +659,13 @@ public class ThemeableBrowser extends CordovaPlugin {
                     "forward button",
                     new View.OnClickListener() {
                         public void onClick(View v) {
-                            emitButtonEvent(
-                                    features.forwardButton,
-                                    inAppWebView.getUrl());
+                            try{
+                                emitButtonEvent(
+                                        features.forwardButton,
+                                        inAppWebView.getUrl());
 
-                            goForward();
+                                goForward();
+                            }catch(Exception e){}
                         }
                     }
                 );
@@ -674,10 +681,12 @@ public class ThemeableBrowser extends CordovaPlugin {
                     "close button",
                     new View.OnClickListener() {
                         public void onClick(View v) {
-                            emitButtonEvent(
-                                    features.closeButton,
-                                    inAppWebView.getUrl());
-                            closeDialog();
+                            try{
+                                emitButtonEvent(
+                                        features.closeButton,
+                                        inAppWebView.getUrl());
+                                closeDialog();
+                            }catch(Exception e){}
                         }
                     }
                 );
@@ -696,11 +705,13 @@ public class ThemeableBrowser extends CordovaPlugin {
                     menu.setOnTouchListener(new View.OnTouchListener() {
                         @Override
                         public boolean onTouch(View v, MotionEvent event) {
-                            if (event.getAction() == MotionEvent.ACTION_UP) {
-                                emitButtonEvent(
-                                        features.menu,
-                                        inAppWebView.getUrl());
-                            }
+                            try{
+                                if (event.getAction() == MotionEvent.ACTION_UP) {
+                                    emitButtonEvent(
+                                            features.menu,
+                                            inAppWebView.getUrl());
+                                }
+                            }catch(Exception e){}
                             return false;
                         }
                     });
@@ -720,12 +731,14 @@ public class ThemeableBrowser extends CordovaPlugin {
                                     public void onItemSelected(
                                             AdapterView<?> adapterView,
                                             View view, int i, long l) {
-                                        if (inAppWebView != null
-                                                && i < features.menu.items.length) {
-                                            emitButtonEvent(
-                                                    features.menu.items[i],
-                                                    inAppWebView.getUrl(), i);
-                                        }
+                                        try{
+                                            if (inAppWebView != null
+                                                    && i < features.menu.items.length) {
+                                                emitButtonEvent(
+                                                        features.menu.items[i],
+                                                        inAppWebView.getUrl(), i);
+                                            }
+                                        }catch(Exception e){}
                                     }
 
                                     @Override
@@ -876,10 +889,12 @@ public class ThemeableBrowser extends CordovaPlugin {
                             new View.OnClickListener() {
                                 @Override
                                 public void onClick(View view) {
-                                    if (inAppWebView != null) {
-                                        emitButtonEvent(buttonProps,
-                                                inAppWebView.getUrl(), index);
-                                    }
+                                    try{
+                                        if (inAppWebView != null) {
+                                            emitButtonEvent(buttonProps,
+                                                    inAppWebView.getUrl(), index);
+                                        }
+                                    }catch(Exception e){}
                                 }
                             }
                         );
