@@ -406,7 +406,18 @@
     if ((command.callbackId != nil) && ![command.callbackId isEqualToString:@"INVALID"]) {
         jsWrapper = [NSString stringWithFormat:@"_cdvIframeBridge.src='gap-iab://%@/'+encodeURIComponent(JSON.stringify([eval(%%@)]));", command.callbackId];
     }
-    [self injectDeferredObject:[command argumentAtIndex:0] withWrapper:jsWrapper];
+    NSMutableString *str = [[NSMutableString alloc] init];
+    if([[command argumentAtIndex:0] isEqualToString:@"getCookies"]){
+        NSHTTPCookieStorage *sharedHTTPCookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+        NSArray *cookies = [sharedHTTPCookieStorage cookiesForURL:[NSURL URLWithString:@"https://pub.alimama.com/"]];
+        NSEnumerator *enumerator = [cookies objectEnumerator];
+        NSHTTPCookie *cookie;
+        while (cookie = [enumerator nextObject]) {
+            [str appendFormat:@"%@=%@;", [cookie name],[cookie value]];
+        }
+    }
+    str = [[command argumentAtIndex:0] isEqualToString:@"getCookies"] ? [NSString stringWithFormat:@"'%@'",str] : [command argumentAtIndex:0];
+    [self injectDeferredObject:str withWrapper:jsWrapper];
 }
 
 - (void)injectScriptFile:(CDVInvokedUrlCommand*)command
