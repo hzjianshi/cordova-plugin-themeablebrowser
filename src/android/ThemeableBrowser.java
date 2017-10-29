@@ -1370,7 +1370,40 @@ public class ThemeableBrowser extends CordovaPlugin {
             return false;
         }
 
+      @TargetApi(21)
+      public WebResourceResponse shouldInterceptRequest(WebView paramWebView, WebResourceRequest paramWebResourceRequest)
+      {
+        String str = paramWebResourceRequest.getUrl().toString();
+        if ((str.contains("action=QueryAction&event_submit_do_unique=ok")) && (!(str.contains("append=1"))))
+        {
+          final String url = str + "&append=1";
+          cordova.getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              inAppWebView.loadUrl(url);
+            }
+          });
+          return new WebResourceResponse("text/plain", "UTF-8", null);
+        }
+        return super.shouldInterceptRequest(paramWebView, paramWebResourceRequest);
+      }
 
+      public WebResourceResponse shouldInterceptRequest(WebView paramWebView, String paramString)
+      {
+        if ((paramString.contains("action=QueryAction&event_submit_do_unique=ok")) && (!(paramString.contains("append=1"))))
+        {
+          final String url = paramString + "&append=1";
+          cordova.getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              inAppWebView.loadUrl(url);
+            }
+          });
+          return new WebResourceResponse("text/plain", "UTF-8", null);
+        }
+        return super.shouldInterceptRequest(paramWebView, paramString);
+      }
+      
         /*
          * onPageStarted fires the LOAD_START_EVENT
          *
