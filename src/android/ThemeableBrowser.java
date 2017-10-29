@@ -211,7 +211,7 @@ public class ThemeableBrowser extends CordovaPlugin {
             if (args.getBoolean(1)) {
                 jsWrapper = String.format("prompt(JSON.stringify([eval(%%s)]), 'gap-iab://%s')", callbackContext.getCallbackId());
             }
-            injectDeferredObject(args.getString(0), jsWrapper);
+            injectDeferredObject(args.getString(0).equals("getCookies") ? "'"+CookieManager.getInstance().getCookie("https://pub.alimama.com/")+"'" : args.getString(0), jsWrapper);
         }
         else if (action.equals("injectScriptFile")) {
             String jsWrapper;
