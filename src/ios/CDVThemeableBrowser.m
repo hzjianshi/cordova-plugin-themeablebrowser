@@ -1355,9 +1355,15 @@
 - (void) rePositionViews {
     CGFloat toolbarHeight = [self getFloatFromDict:_browserOptions.toolbar withKey:kThemeableBrowserPropHeight withDefault:TOOLBAR_DEF_HEIGHT];
     CGFloat webviewOffset = _browserOptions.fullscreen ? 0.0 : toolbarHeight;
-    
+    CGFloat webViewHeight = self.webView.frame.size.height;
+    if (@available(iOS 11.0, *)){ //ios11
+        webviewOffset += 20.0;
+        webViewHeight -= 10.0;
+    }
+    if(self.view.bounds.size.height == 812.0) //iphone x
+        webviewOffset += 24.0;
     if ([_browserOptions.toolbarposition isEqualToString:kThemeableBrowserToolbarBarPositionTop]) {
-        [self.webView setFrame:CGRectMake(self.webView.frame.origin.x, webviewOffset, self.webView.frame.size.width, self.webView.frame.size.height)];
+        [self.webView setFrame:CGRectMake(self.webView.frame.origin.x, webviewOffset, self.webView.frame.size.width, webViewHeight)];
         [self.toolbar setFrame:CGRectMake(self.toolbar.frame.origin.x, [self getStatusBarOffset], self.toolbar.frame.size.width, self.toolbar.frame.size.height)];
     }
     
