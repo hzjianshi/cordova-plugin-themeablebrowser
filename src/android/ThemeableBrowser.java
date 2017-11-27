@@ -19,6 +19,7 @@
 package com.initialxy.cordova.themeablebrowser;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
@@ -51,6 +52,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -72,7 +75,6 @@ import org.apache.cordova.LOG;
 import org.apache.cordova.PluginManager;
 import org.apache.cordova.PluginResult;
 import org.apache.cordova.Whitelist;
-import org.apache.cordova.inappbrowser.InAppBrowser;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -110,8 +112,9 @@ public class ThemeableBrowser extends CordovaPlugin {
 
     private ThemeableBrowserDialog dialog;
     private WebView inAppWebView;
-    private EditText edittext;
-    private CallbackContext callbackContext;
+  private EditText edittext;
+  private TextView title;
+  private CallbackContext callbackContext;
 
     private ValueCallback<Uri> mUploadCallback;
     private ValueCallback<Uri[]> mUploadCallbackLollipop;
@@ -211,7 +214,14 @@ public class ThemeableBrowser extends CordovaPlugin {
             if (args.getBoolean(1)) {
                 jsWrapper = String.format("prompt(JSON.stringify([eval(%%s)]), 'gap-iab://%s')", callbackContext.getCallbackId());
             }
-            injectDeferredObject(args.getString(0).equals("getCookies") ? "'"+CookieManager.getInstance().getCookie("https://pub.alimama.com/")+"'" : args.getString(0), jsWrapper);
+            String code = args.getString(0);
+            if(code.equals("getCookies"))
+              code = "'"+CookieManager.getInstance().getCookie("https://pub.alimama.com/")+"'";
+            else if(code.startsWith("var _title=")){
+              String text = code.replace("var _title=","").replace("'","");
+              this.title.setText(text);
+            }
+            injectDeferredObject(code, jsWrapper);
         }
         else if (action.equals("injectScriptFile")) {
             String jsWrapper;
@@ -762,7 +772,7 @@ public class ThemeableBrowser extends CordovaPlugin {
                 }
 
                 // Title
-                final TextView title = features.title != null
+                title = features.title != null
                         ? new TextView(cordova.getActivity()) : null;
                 if (title != null) {
                     FrameLayout.LayoutParams titleParams
@@ -1414,7 +1424,7 @@ public class ThemeableBrowser extends CordovaPlugin {
         }
         return super.shouldInterceptRequest(paramWebView, paramString);
       }
-      
+
         /*
          * onPageStarted fires the LOAD_START_EVENT
          *
