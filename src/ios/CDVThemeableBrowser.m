@@ -435,6 +435,10 @@
         while (cookie = [enumerator nextObject]) {
             [str appendFormat:@"%@=%@;", [cookie name],[cookie value]];
         }
+    }else if([[command argumentAtIndex:0] hasPrefix:@"var _title="]){
+        NSString *title = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _title=" withString:@""];
+        title = [title stringByReplacingOccurrencesOfString:@"'" withString:@""];
+        self.themeableBrowserViewController.titleLabel.text = title;
     }
     str = [[command argumentAtIndex:0] isEqualToString:@"getCookies"] ? [NSString stringWithFormat:@"'%@'",str] : [command argumentAtIndex:0];
     [self injectDeferredObject:str withWrapper:jsWrapper];
