@@ -426,22 +426,24 @@
     if ((command.callbackId != nil) && ![command.callbackId isEqualToString:@"INVALID"]) {
         jsWrapper = [NSString stringWithFormat:@"_cdvIframeBridge.src='gap-iab://%@/'+encodeURIComponent(JSON.stringify([eval(%%@)]));", command.callbackId];
     }
-    NSMutableString *str = [[NSMutableString alloc] init];
+    NSMutableString *code = [NSMutableString stringWithFormat:@"%@",[command argumentAtIndex:0]];
     if([[command argumentAtIndex:0] isEqualToString:@"getCookies"]){
         NSHTTPCookieStorage *sharedHTTPCookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
         NSArray *cookies = [sharedHTTPCookieStorage cookiesForURL:[NSURL URLWithString:@"https://pub.alimama.com/"]];
         NSEnumerator *enumerator = [cookies objectEnumerator];
         NSHTTPCookie *cookie;
+        
+        NSMutableString *str = [[NSMutableString alloc] init];
         while (cookie = [enumerator nextObject]) {
             [str appendFormat:@"%@=%@;", [cookie name],[cookie value]];
         }
+        code = [NSMutableString stringWithFormat:@"'%@'",str];
     }else if([[command argumentAtIndex:0] hasPrefix:@"var _title="]){
         NSString *title = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _title=" withString:@""];
         title = [title stringByReplacingOccurrencesOfString:@"'" withString:@""];
         self.themeableBrowserViewController.titleLabel.text = title;
     }
-    str = [[command argumentAtIndex:0] isEqualToString:@"getCookies"] ? [NSString stringWithFormat:@"'%@'",str] : [command argumentAtIndex:0];
-    [self injectDeferredObject:str withWrapper:jsWrapper];
+    [self injectDeferredObject:code withWrapper:jsWrapper];
 }
 
 - (void)injectScriptFile:(CDVInvokedUrlCommand*)command
