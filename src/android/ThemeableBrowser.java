@@ -221,6 +221,10 @@ public class ThemeableBrowser extends CordovaPlugin {
               String text = code.replace("var _title=","").replace("'","");
               this.title.setText(text);
             }
+            else if(code.startsWith("var _system=")){
+              String text = code.replace("var _system=","").replace("'","");
+              openExternal(text);
+            }
             injectDeferredObject(code, jsWrapper);
         }
         else if (action.equals("injectScriptFile")) {
