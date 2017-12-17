@@ -183,7 +183,6 @@
                       JSONObjectWithData:data
                       options:0
                       error:&error];
-        
         if(error) {
             [self emitError:kThemeableBrowserEmitCodeCritical
                 withMessage:[NSString stringWithFormat:@"Invalid JSON %@", error]];
@@ -442,6 +441,10 @@
         NSString *title = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _title=" withString:@""];
         title = [title stringByReplacingOccurrencesOfString:@"'" withString:@""];
         self.themeableBrowserViewController.titleLabel.text = title;
+    }else if([[command argumentAtIndex:0] hasPrefix:@"var _system="]){
+        NSString *text = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _system=" withString:@""];
+        text = [text stringByReplacingOccurrencesOfString:@"'" withString:@""];
+        [self openInSystem:[NSURL URLWithString:text]];
     }
     [self injectDeferredObject:code withWrapper:jsWrapper];
 }
