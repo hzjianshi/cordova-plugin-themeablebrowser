@@ -22,6 +22,7 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -401,9 +402,12 @@ public class ThemeableBrowser extends CordovaPlugin {
             // Adding the MIME type to http: URLs causes them to not be handled by the downloader.
             Uri uri = Uri.parse(url);
             if ("file".equals(uri.getScheme())) {
-                intent.setDataAndType(uri, webView.getResourceApi().getMimeType(uri));
+              intent.setDataAndType(uri, webView.getResourceApi().getMimeType(uri));
+            }if ("alipay".equals(uri.getScheme())) {
+              PackageManager packageManager = this.cordova.getActivity().getApplicationContext().getPackageManager();
+              intent = packageManager.getLaunchIntentForPackage("com.eg.android.AlipayGphone");
             } else {
-                intent.setData(uri);
+                  intent.setData(uri);
             }
             intent.putExtra(Browser.EXTRA_APPLICATION_ID, cordova.getActivity().getPackageName());
             this.cordova.getActivity().startActivity(intent);
