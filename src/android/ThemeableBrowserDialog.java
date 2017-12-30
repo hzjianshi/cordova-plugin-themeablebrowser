@@ -53,7 +53,7 @@ public class ThemeableBrowserDialog extends Dialog {
             // up
             if (this.hardwareBack && this.themeableBrowser.canGoBack()) {
                 this.themeableBrowser.goBack();
-            }  else {
+            }  else if(this.hardwareBack) {
                 this.themeableBrowser.closeDialog();
             }
         }
