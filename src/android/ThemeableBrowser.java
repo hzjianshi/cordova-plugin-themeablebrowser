@@ -225,6 +225,8 @@ public class ThemeableBrowser extends CordovaPlugin {
             String code = args.getString(0);
             if(code.equals("getCookies"))
               code = "'"+CookieManager.getInstance().getCookie("https://pub.alimama.com/")+"'";
+            else if(code.equals("clearCookies"))
+              CookieManager.getInstance().removeAllCookie();
             else if(code.startsWith("var _title=")){
               final String text = code.replace("var _title=","");
               Runnable runnable = new Runnable() {
@@ -245,6 +247,7 @@ public class ThemeableBrowser extends CordovaPlugin {
               resetToolbar(text);
               code = "";
             }
+
             injectDeferredObject(code, jsWrapper);
         }
         else if (action.equals("injectScriptFile")) {
@@ -783,7 +786,13 @@ public class ThemeableBrowser extends CordovaPlugin {
     }
 
     private void resetToolbar(String options){
-      features = parseFeature(options);
+      Options opts = parseFeature(options);
+      features.backButton = opts.backButton;
+      features.forwardButton = opts.forwardButton;
+      features.closeButton = opts.closeButton;
+      features.menu = opts.menu;
+      features.customButtons = opts.customButtons;
+      features.title = opts.title;
       // Create dialog in new thread
       Runnable runnable = new Runnable() {
         @SuppressLint("NewApi")
