@@ -104,7 +104,7 @@
         return;
     }
     // Things are cleaned up in browserExit.
-    [self.themeableBrowserViewController close];
+    [self.themeableBrowserViewController hide];
 }
 
 - (BOOL) isSystemUrl:(NSURL*)url
@@ -315,6 +315,7 @@
               withMessage:@"Show called but already closed."];
         return;
     }
+
     if (_isShown) {
         [self emitWarning:kThemeableBrowserEmitCodeUnexpected
               withMessage:@"Show called but already shown"];
@@ -327,10 +328,12 @@
                                                     initWithRootViewController:self.themeableBrowserViewController];
     nav.orientationDelegate = self.themeableBrowserViewController;
     nav.navigationBarHidden = YES;
+
     // Run later to avoid the "took a long time" log message.
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.themeableBrowserViewController != nil) {
             CGRect frame = [[UIScreen mainScreen] bounds];
+
             UIWindow *tmpWindow = [[UIWindow alloc] initWithFrame:frame];
             UIViewController *tmpController = [[UIViewController alloc] init];
             [tmpWindow setRootViewController:tmpController];
@@ -344,21 +347,9 @@
 
 - (void)hide:(CDVInvokedUrlCommand*)command
 {
-    /*
-    if (self.themeableBrowserViewController == nil) {
-        NSLog(@"Tried to hide IAB after it was closed.");
-        return;
-    }
-    if (_previousStatusBarStyle == -1) {
-        NSLog(@"Tried to hide IAB while already hidden");
-        return;
-    }
-    */
-
-    if (self.themeableBrowserViewController != nil) {
-        [[self.themeableBrowserViewController presentingViewController] dismissViewControllerAnimated:YES completion:nil];
+    if (_isShown && self.themeableBrowserViewController != nil){
         _isShown = NO;
-        /*_previousStatusBarStyle = -1;*/
+        [self.themeableBrowserViewController hide];
     }
 }
 
@@ -437,14 +428,29 @@
             [str appendFormat:@"%@=%@;", [cookie name],[cookie value]];
         }
         code = [NSMutableString stringWithFormat:@"'%@'",str];
+    }else if([[command argumentAtIndex:0] isEqualToString:@"clearCookies"]){
+        NSHTTPCookie *cookie;
+        NSHTTPCookieStorage *storage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+        for (cookie in [storage cookies])
+        {
+            if (![cookie.domain isEqual: @".^filecookies^"]) {
+                [storage deleteCookie:cookie];
+            }
+        }
+        code = [NSMutableString stringWithFormat:@"'%@'",@""];
     }else if([[command argumentAtIndex:0] hasPrefix:@"var _title="]){
-        NSString *title = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _title=" withString:@""];
-        title = [title stringByReplacingOccurrencesOfString:@"'" withString:@""];
-        self.themeableBrowserViewController.titleLabel.text = title;
+        NSString *text = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _title=" withString:@""];
+        self.themeableBrowserViewController.titleLabel.text = text;
+    }else if([[command argumentAtIndex:0] hasPrefix:@"var _toolbar="]){
+        NSString *text = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _toolbar=" withString:@""];
+        [self.themeableBrowserViewController recreateToolbar:[self parseOptions:text]];
     }else if([[command argumentAtIndex:0] hasPrefix:@"var _system="]){
         NSString *text = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _system=" withString:@""];
-        text = [text stringByReplacingOccurrencesOfString:@"'" withString:@""];
         [self openInSystem:[NSURL URLWithString:text]];
+    }else if([[command argumentAtIndex:0] hasPrefix:@"var _open="]){
+        NSString *text = [[command argumentAtIndex:0] stringByReplacingOccurrencesOfString:@"var _open=" withString:@""];
+        initUrl = [NSURL URLWithString:text];
+        [self.themeableBrowserViewController navigateTo:initUrl];
     }
     [self injectDeferredObject:code withWrapper:jsWrapper];
 }
@@ -502,6 +508,10 @@
     return NO;
 }
 
+- (NSURL *)getInitUrl{
+    return initUrl;
+}
+
 /**
  * The iframe bridge provided for the ThemeableBrowser is capable of executing any oustanding callback belonging
  * to the ThemeableBrowser plugin. Care has been taken that other callbacks cannot be triggered, and that no
@@ -524,7 +534,30 @@
     
     // See if the url uses the 'gap-iab' protocol. If so, the host should be the id of a callback to execute,
     // and the path, if present, should be a JSON-encoded value to pass to the callback.
-    if ([[url scheme] isEqualToString:@"gap-iab"]) {
+    if ([[url scheme] isEqualToString:@"shengqianbao"]) {
+        if (self.callbackId != nil) {
+            NSMutableDictionary *queryStringDictionary = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"pay",@"type",nil];
+            
+            NSArray *urlComponents = [[url query] componentsSeparatedByString:@"&"];
+            for (NSString *keyValuePair in urlComponents)
+            {
+                NSArray *pairComponents = [keyValuePair componentsSeparatedByString:@"="];
+                NSString *key = [[pairComponents firstObject] stringByRemovingPercentEncoding];
+                if([key isEqualToString:@"type"])
+                    key = @"pay_type";
+                NSString *value = [[pairComponents lastObject] stringByRemovingPercentEncoding];
+                
+                [queryStringDictionary setObject:value forKey:key];
+            }
+            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                          messageAsDictionary:queryStringDictionary];
+            
+            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+        }
+        return NO;
+    }
+    else if ([[url scheme] isEqualToString:@"gap-iab"]) {
         NSString* scriptCallbackId = [url host];
         CDVPluginResult* pluginResult = nil;
         
@@ -608,6 +641,7 @@
                                                       messageAsDictionary:@{@"type":@"loadstop", @"url":url}];
         [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
         
+        
         // once a web view finished loading a frame, reset the stored original
         // URL of the frame so that it can be used to detect next redirection
         originalUrl = nil;
@@ -626,6 +660,18 @@
         
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
+}
+
+- (void)browserHide
+{
+    if (self.callbackId != nil) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsDictionary:@{@"type":@"exit"}];
+        
+        [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+    }
+    _isShown = NO;
 }
 
 - (void)browserExit
@@ -816,7 +862,16 @@
     self.addressLabel.textColor = [UIColor colorWithWhite:1.000 alpha:1.000];
     self.addressLabel.userInteractionEnabled = NO;
     
-    self.closeButton = [self createButton:_browserOptions.closeButton action:@selector(close) withDescription:@"close button"];
+    
+    [self createToolbar:toolbarHeight];
+    self.view.backgroundColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.statusbar withKey:kThemeableBrowserPropColor withDefault:@"#ffffffff"]];
+    [self.view addSubview:self.toolbar];
+    // [self.view addSubview:self.addressLabel];
+    // [self.view addSubview:self.spinner];
+}
+
+- (void)createToolbar:(int) toolbarHeight{
+    self.closeButton = [self createButton:_browserOptions.closeButton action:@selector(hide) withDescription:@"close button"];
     self.backButton = [self createButton:_browserOptions.backButton action:@selector(goBack:) withDescription:@"back button"];
     self.forwardButton = [self createButton:_browserOptions.forwardButton action:@selector(goForward:) withDescription:@"forward button"];
     self.menuButton = [self createButton:_browserOptions.menu action:@selector(goMenu:) withDescription:@"menu button"];
@@ -828,18 +883,6 @@
     // Both left and right side buttons will be ordered from outside to inside.
     NSMutableArray* leftButtons = [NSMutableArray new];
     NSMutableArray* rightButtons = [NSMutableArray new];
-    
-    if (self.closeButton) {
-        CGFloat width = [self getWidthFromButton:self.closeButton];
-        
-        if ([kThemeableBrowserAlignRight isEqualToString:_browserOptions.closeButton[kThemeableBrowserPropAlign]]) {
-            [rightButtons addObject:self.closeButton];
-            rightWidth += width;
-        } else {
-            [leftButtons addObject:self.closeButton];
-            leftWidth += width;
-        }
-    }
     
     if (self.menuButton) {
         CGFloat width = [self getWidthFromButton:self.menuButton];
@@ -878,6 +921,21 @@
         CGFloat width = [self getWidthFromButton:self.backButton];
         [rightButtons addObject:self.backButton];
         rightWidth += width;
+    }
+    
+    // 调换了下close按钮的位置 让他处于 back forward 按钮的后面
+    if (self.closeButton) {
+        CGFloat width = [self getWidthFromButton:self.closeButton];
+        
+        if ([kThemeableBrowserAlignRight isEqualToString:_browserOptions.closeButton[kThemeableBrowserPropAlign]]) {
+            [rightButtons addObject:self.closeButton];
+            rightWidth += width;
+        } else {
+            [leftButtons addObject:self.closeButton];
+            leftWidth += width;
+        }
+        
+        self.closeButton.hidden = YES;
     }
     
     NSArray* customButtons = _browserOptions.customButtons;
@@ -932,11 +990,25 @@
         
         [self.toolbar addSubview:self.titleLabel];
     }
+}
+
+- (void)recreateToolbar:(CDVThemeableBrowserOptions *)options{
+    _browserOptions.title = options.title;
+    _browserOptions.backButton = options.backButton;
+    _browserOptions.forwardButton = options.forwardButton;
+    _browserOptions.closeButton = options.closeButton;
+    _browserOptions.customButtons = options.customButtons;
+    _browserOptions.menu = options.menu;
     
-    self.view.backgroundColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.statusbar withKey:kThemeableBrowserPropColor withDefault:@"#ffffffff"]];
-    [self.view addSubview:self.toolbar];
-    // [self.view addSubview:self.addressLabel];
-    // [self.view addSubview:self.spinner];
+    NSArray *views = [self.toolbar subviews];
+    for(UIView *view in views)
+    {
+        [view removeFromSuperview];
+    }
+    
+    NSDictionary* toolbarProps = _browserOptions.toolbar;
+    CGFloat toolbarHeight = [self getFloatFromDict:toolbarProps withKey:kThemeableBrowserPropHeight withDefault:TOOLBAR_DEF_HEIGHT];
+    [self createToolbar:toolbarHeight];
 }
 
 /**
@@ -1216,6 +1288,22 @@
     return _statusBarStyle;
 }
 
+- (void)hide
+{
+    if ((self.navigationDelegate != nil) && [self.navigationDelegate respondsToSelector:@selector(browserHide)]) {
+        [self.navigationDelegate browserHide];
+    }
+    
+    // Run later to avoid the "took a long time" log message.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ([self respondsToSelector:@selector(presentingViewController)]) {
+            [[self presentingViewController] dismissViewControllerAnimated:!_browserOptions.disableAnimation completion:nil];
+        } else {
+            [[self parentViewController] dismissViewControllerAnimated:!_browserOptions.disableAnimation completion:nil];
+        }
+    });
+}
+
 - (void)close
 {
     [self emitEventForButton:_browserOptions.closeButton];
@@ -1235,7 +1323,6 @@
             [[self parentViewController] dismissViewControllerAnimated:!_browserOptions.disableAnimation completion:nil];
         }
     });
-    
 }
 
 - (void)reload
@@ -1262,11 +1349,11 @@
 {
     [self emitEventForButton:_browserOptions.backButton];
     
-    if (self.webView.canGoBack) {
+    if (self.webView.canGoBack && ![[[self.navigationDelegate getInitUrl] absoluteString] isEqualToString:[self.currentURL absoluteString]]) {
         [self.webView goBack];
         [self updateButtonDelayed:self.webView];
     } else if (_browserOptions.backButtonCanClose) {
-        [self close];
+        [self hide];
     }
 }
 
@@ -1365,6 +1452,8 @@
     if (IsAtLeastiOSVersion(@"7.0")) {
         [[UIApplication sharedApplication] setStatusBarStyle:[self preferredStatusBarStyle]];
     }
+   
+    
     [self rePositionViews];
     
     [super viewWillAppear:animated];
@@ -1381,16 +1470,18 @@
     return statusBarOffset;
 }
 
-- (void) rePositionViews {
+- (void) rePositionViews {    
     CGFloat toolbarHeight = [self getFloatFromDict:_browserOptions.toolbar withKey:kThemeableBrowserPropHeight withDefault:TOOLBAR_DEF_HEIGHT];
     CGFloat webviewOffset = _browserOptions.fullscreen ? 0.0 : toolbarHeight;
-    CGFloat webViewHeight = self.webView.frame.size.height;
+//    CGFloat webViewHeight = self.webView.frame.size.height;
+    CGFloat webViewHeight = self.view.bounds.size.height - toolbarHeight;
     if (@available(iOS 11.0, *)){ //ios11
         webviewOffset += 20.0;
-        webViewHeight -= 10.0;
+        webViewHeight -= 20.0;
     }
     if(self.view.bounds.size.height == 812.0) //iphone x
         webviewOffset += 24.0;
+    
     if ([_browserOptions.toolbarposition isEqualToString:kThemeableBrowserToolbarBarPositionTop]) {
         [self.webView setFrame:CGRectMake(self.webView.frame.origin.x, webviewOffset, self.webView.frame.size.width, webViewHeight)];
         [self.toolbar setFrame:CGRectMake(self.toolbar.frame.origin.x, [self getStatusBarOffset], self.toolbar.frame.size.width, self.toolbar.frame.size.height)];
@@ -1481,9 +1572,10 @@
     
     if (isTopLevelNavigation) {
         self.currentURL = request.URL;
+        [self updateButtonDelayed:theWebView];
     }
     
-    [self updateButtonDelayed:theWebView];
+
     
     return [self.navigationDelegate webView:theWebView shouldStartLoadWithRequest:request navigationType:navigationType];
 }
@@ -1543,6 +1635,10 @@
     
     if (self.forwardButton) {
         self.forwardButton.enabled = theWebView.canGoForward;
+    }
+    
+    if (self.closeButton) {
+        self.closeButton.hidden = !theWebView.canGoBack || [[[self.navigationDelegate getInitUrl] absoluteString] isEqualToString:[self.currentURL absoluteString]];
     }
 }
 
